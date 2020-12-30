@@ -18,8 +18,8 @@ import java.util.Properties;
 
 /**
  * This is kafka stream application to count number of words
- * Create input and out topics
- * Produce messages from kafka console producer to input topic, run this application and consumer messages from output topic using kafka console consumer
+ * Create input and output topics
+ * Produce messages from kafka console producer to input topic, run this application and consume messages from output topic using kafka console consumer
  */
 public class WordCountStreamApplication {
 
