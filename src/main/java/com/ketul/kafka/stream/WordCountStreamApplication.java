@@ -7,8 +7,7 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +50,7 @@ public class WordCountStreamApplication {
         Get a Stream from kafka topic
          */
         StreamsBuilder builder = new StreamsBuilder();
-        KStream<String, String> wordCountInput = builder.stream(StreamConstants.WORD_INPUT_TOPIC);
+        KStream<String, String> wordCountInput = builder.stream(StreamConstants.WORD_INPUT_TOPIC, Consumed.as(String.format("stream_sentences_from_%s_topic", StreamConstants.WORD_INPUT_TOPIC)));
 
         KTable<String, Long> wordCounts = wordCountInput
                 .mapValues(sentence -> {
@@ -61,7 +60,7 @@ public class WordCountStreamApplication {
                     output = <null,kafka connect and kafka stream>
                      */
                     return sentence.toLowerCase();
-                })
+                }, Named.as("convert_sentence_to_lower_case"))
                 .flatMapValues(sentence -> {
                     List<String> words = Arrays.asList(sentence.split(" "));
                     LOGGER.info("Converting \'{}\' to words list {}", sentence, words.toString());
@@ -69,22 +68,22 @@ public class WordCountStreamApplication {
                     output = <null,kafka>,<null,connect>,<null,and>,<null,kafka>,<null,stream>
                      */
                     return words;
-                })
+                }, Named.as("convert_lower_cased_sentence_to_null_key_and_value_word_pairs"))
                 .selectKey((keyToChange, word) -> {
                     LOGGER.info("Making key {} same as word {}", keyToChange, word);
                     /*
                     output = <kafka,kafka>,<connect,connect>,<and,and>,<kafka,kafka>,<stream,stream>
                      */
                     return word;
-                })
+                }, Named.as("make_null_key_same_as_value_word"))
                 /*
                 output of groupByKey() = (<kafka,kafka>,<kafka,kafka>),(<connect,connect>),(<and,and>),(<stream,stream>)
                  */
-                .groupByKey()
+                .groupByKey(Grouped.as("group_by_word"))
                 /*
                 output count() = <kafka,2>,<connect,1>,<and,1>,<stream,1>
                  */
-                .count();
+                .count(Named.as("count_total_occurrences_of_words"));
 
         /*
         Please note that I have added logging intentionally to understand the flow. It is big overhead to log everything in real stream application.
@@ -100,7 +99,7 @@ public class WordCountStreamApplication {
         /*
         Setting output topic to write output to
          */
-        wordCounts.toStream().to(StreamConstants.WORD_OUTPUT_TOPIC);
+        wordCounts.toStream(Named.as("convert_table_to_stream")).to(StreamConstants.WORD_OUTPUT_TOPIC, Produced.as(String.format("write_count_by_words_to_%s_topic", StreamConstants.WORD_OUTPUT_TOPIC)));
 
         return builder.build();
     }
